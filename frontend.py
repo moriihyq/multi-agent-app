@@ -11,7 +11,7 @@ API_BASE_URL = "https://multi-agent-app-qj2u.onrender.com"
 # --- 页面基础设置 ---
 # ... (这部分代码保持不变，为简洁省略) ...
 st.set_page_config(page_title="多智能体研究助手", page_icon="🧠", layout="wide")
-st.title("🧠 你的专属研究智能体")
+st.title("🧠 黄sir的专属研究智能体")
 st.caption("随时随地，在你的手机上进行深度研究。由 Gemini & LangChain 强力驱动。")
 st.subheader("1. 选择智能体模式")
 agent_mode = st.radio(
@@ -89,5 +89,6 @@ if st.button("🚀 开始研究", type="primary"):
 
         except requests.exceptions.RequestException as e:
             st.error(f"无法连接到后端服务: {e}")
+
 
 
