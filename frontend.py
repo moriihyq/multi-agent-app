@@ -4,7 +4,7 @@ import requests
 
 # --- API 地址配置 ---
 # 【重要】现在它指向本地测试地址。部署后，我们会修改这里。
-API_URL = "http://127.0.0.1:8000/research" 
+API_URL = "https://multi-agent-app-qj2u.onrender.com/research" 
 
 # --- 页面基础设置 ---
 st.set_page_config(page_title="多智能体研究助手", page_icon="🧠", layout="wide")
@@ -56,4 +56,5 @@ if st.button("🚀 开始研究", type="primary"):
                     
             except requests.exceptions.RequestException as e:
                 st.error(f"网络连接失败，请确保后端 API 服务正在运行。")
+
                 st.error(f"错误详情: {e}")
