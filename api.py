@@ -1,59 +1,77 @@
-# api.py
-from fastapi import FastAPI, HTTPException
+# api.py (异步任务架构版)
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import uvicorn
 from agent_factory import create_agent_executor
+import uuid
+import time
 
-# 初始化 FastAPI 应用
-app = FastAPI(
-    title="Multi-Agent Research API",
-    description="一个可以在云端运行并随时调用的多智能体研究应用 API",
-    version="1.0.0",
-)
+# --- 应用和内存数据库初始化 ---
+app = FastAPI(title="Multi-Agent Research API")
 
-# 定义请求的数据模型，确保前端传来的数据格式正确
+# 【重要】这是一个简单的内存“数据库”，用于存储任务状态。
+# 在免费服务上，如果服务器休眠或重启，任务会丢失，但这对于个人使用已足够。
+tasks = {}
+
+# --- 数据模型定义 ---
 class ResearchRequest(BaseModel):
     topic: str
-    mode: str  # "ai" or "general"
-    user_profile: str = "（未提供）" # 为通用模式提供默认值
+    mode: str
+    user_profile: str = "（未提供）"
 
-# 定义 API 的主端点，地址是 /research
-@app.post("/research")
-async def research(request: ResearchRequest):
-    """
-    接收研究请求，调用相应的智能体，并返回结果。
-    """
-    print(f"--- [API Received]: Mode='{request.mode}', Topic='{request.topic}' ---")
+# --- 后台任务执行函数 ---
+def run_agent_in_background(task_id: str, request: ResearchRequest):
+    """这个函数将在后台运行，不会阻塞API响应。"""
     try:
+        # 标记任务开始执行
+        tasks[task_id]["status"] = "running"
+        tasks[task_id]["start_time"] = time.time()
+        
         agent_executor = create_agent_executor(mode=request.mode)
         
         if request.mode == "ai":
             input_data = {"input": request.topic}
-        else: # general mode
-            input_data = {
-                "input": request.topic,
-                "user_profile": request.user_profile
-            }
+        else:
+            input_data = {"input": request.topic, "user_profile": request.user_profile}
         
-        # 【核心】调用你的智能体
         result = agent_executor.invoke(input_data)
         
-        print("--- [API Responded]: Successfully returned agent output. ---")
-        return {"status": "success", "output": result['output']}
+        # 任务成功完成
+        tasks[task_id]["status"] = "completed"
+        tasks[task_id]["result"] = result['output']
+        tasks[task_id]["end_time"] = time.time()
         
-    except ValueError as e:
-        # 如果模式错误，返回清晰的错误信息
-        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        # 如果智能体运行出错，返回服务器错误
-        print(f"--- [Agent Error]: An unexpected error occurred: {e} ---")
-        raise HTTPException(status_code=500, detail=f"智能体在执行时发生内部错误: {e}")
+        # 任务失败
+        tasks[task_id]["status"] = "failed"
+        tasks[task_id]["result"] = f"An error occurred: {str(e)}"
+        tasks[task_id]["end_time"] = time.time()
 
-# 添加一个根路径，用于测试服务是否启动成功
-@app.get("/")
-def read_root():
-    return {"message": "欢迎使用多智能体研究 API!"}
+# --- API 端点定义 ---
 
-# 方便你在本地电脑上直接运行测试
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.post("/start-research")
+async def start_research(request: ResearchRequest, background_tasks: BackgroundTasks):
+    """接收任务，立即返回一个任务ID，并在后台开始执行。"""
+    task_id = str(uuid.uuid4())
+    tasks[task_id] = {"status": "pending", "result": None}
+    
+    # 【核心】将耗时的 agent 调用添加到后台任务队列
+    background_tasks.add_task(run_agent_in_background, task_id, request)
+    
+    return {"task_id": task_id}
+
+@app.get("/task-status/{task_id}")
+async def get_task_status(task_id: str):
+    """根据任务ID查询任务的当前状态。"""
+    task = tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"status": task["status"]}
+
+@app.get("/task-result/{task_id}")
+async def get_task_result(task_id: str):
+    """根据任务ID获取最终的执行结果。"""
+    task = tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"status": task["status"], "result": task["result"]}
