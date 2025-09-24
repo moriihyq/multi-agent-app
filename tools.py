@@ -21,7 +21,7 @@ def research_topic(topic: str) -> list[dict]:
         response = tavily_client.search(
             query=topic, 
             search_depth="advanced",
-            max_results=4
+            max_results=3
         )
         
         structured_results = [{"url": res["url"], "content": res["content"]} for res in response.get("results", [])]
@@ -30,3 +30,4 @@ def research_topic(topic: str) -> list[dict]:
         print(f"--- [工具错误]: Tavily 搜索失败: {e} ---")
 
         return []
+
