@@ -16,7 +16,7 @@ def create_agent_executor(mode: str) -> AgentExecutor:
     Returns:
         AgentExecutor: 一个配置完毕、随时可以被调用的智能体。
     """
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0.7)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.6)
     tools = [research_topic]
 
     if mode == "ai":
@@ -29,4 +29,5 @@ def create_agent_executor(mode: str) -> AgentExecutor:
     prompt = PromptTemplate.from_template(prompt_template)
     agent = create_react_agent(llm, tools, prompt)
     
+
     return AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
